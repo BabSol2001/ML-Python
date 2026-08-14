@@ -1,4 +1,5 @@
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,7 +7,7 @@ import sympy as sp
 import torch
 
 from integration_test import exact_solution
-# وارد کردن ابزارهای وابسته پروژه
+# وارد کردن ابزارهای وابسته به پروژه
 from pinn import train_pinn
 from search_tool import SmartEducationalSearchEngine
 
@@ -61,6 +62,31 @@ class SocraticMathTutor:
         math_chars = ['*', '/', '+', '-', '**', '^', '(', ')']
         return any(char in user_input for char in math_chars)
 
+    def _trigger_educational_search(self, concept_key: str):
+        """فراخوانی موتور جستجوی زنده و ارائه تحلیل ملموس آموزشی"""
+        print('\n🔍 [در حال جستجو در وب و سنتز آموزش انسانی...]')
+
+        # فراخوانی متد اصلی سنتز پویا
+        if hasattr(self.search_tool, 'get_dynamic_explanation'):
+            explanation = self.search_tool.get_dynamic_explanation(concept_key)
+        else:
+            explanation = 'تحلیل آموزشی در دسترس نیست.'
+
+        words_count = len(explanation.split())
+        print(
+            '------------------------------------------------------------'
+        )
+        print(
+            f'🌐 [عصاره جستجو و تحلیل زنده وب | طول متن: {words_count} واژه]:'
+        )
+        print(
+            '------------------------------------------------------------'
+        )
+        print(explanation)
+        print(
+            '------------------------------------------------------------\n'
+        )
+
     def ask_socratic_step(
         self,
         title: str,
@@ -72,6 +98,9 @@ class SocraticMathTutor:
         validation_type: str = 'sympy',
     ):
         """اجرای یک گام تعاملی هوشمند با پشتیبانی از ارزیابی‌های چندلایه و سرچ هوشمند"""
+        if concept_keywords is None:
+            concept_keywords = []
+
         print(
             f'\n============================================================'
         )
@@ -104,6 +133,7 @@ class SocraticMathTutor:
                 print(
                     '\n✅ آفرین! پاسخ شما کاملاً درست است. استدلال ریاضی شیوایی داشتید.'
                 )
+                self._trigger_educational_search(concept_key)
                 break
 
             # فاز ۱.۴: تشخیص هوشمند خطای T بزرگ (دما) به جای t کوچک (زمان)
@@ -153,17 +183,13 @@ class SocraticMathTutor:
                 print(f'💡 راهنمایی ۲ (ساختار ریاضی): {hints[1]}')
             elif attempt == 3:
                 print(f'💡 راهنمایی ۳ (کمک مستقیم): {hints[2]}')
-
-                # فراخوانی موتور سرچ هوشمند با کلید مفهومی استاندارد
-                web_example = self.search_tool.search_educational_analogy(
-                    concept_key
-                )
-                print(f'\n🔍 [مثال زنده و تحلیل موتور سرچ]:\n{web_example}')
+                self._trigger_educational_search(concept_key)
             else:
                 print(f'✨ پاسخ این مرحله: {target_expr}')
                 print(
                     'اصلاً نگران نباش! هدف اصلی درک روند حل است. بریم سراغ گام بعدی.'
                 )
+                self._trigger_educational_search(concept_key)
                 break
 
     def run_pinn_verification_demo(self, user_final_expr):
@@ -186,6 +212,7 @@ class SocraticMathTutor:
             'آیا مایلید شبکه عصبی را آموزش داده و نمودار مقایسه را تولید کنیم؟ (y/n): '
         )
         if confirm.lower() == 'y':
+            print('\n[در حال آموزش شبکه عصبی PINN... لطفاً شکیبا باشید]')
             model = train_pinn()
 
             x_test = np.linspace(0, 1.0, 100).reshape(-1, 1)
@@ -240,7 +267,7 @@ class SocraticMathTutor:
 ============================================================
 سلام! من همراه آموزش ریاضی شما هستم. قرار است گام‌به‌گام معادله زیر را حل کنیم:
 
-       dT/dt = alpha * d^2T/dx^2
+        dT/dt = alpha * d^2T/dx^2
 
 شرایط مرزی: T(0,t) = 0  و  T(L,t) = 0
 شرط اولیه:  T(x,0) = sin(pi * x / L)
