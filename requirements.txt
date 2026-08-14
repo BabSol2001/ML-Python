@@ -19,6 +19,7 @@ cryptography==50.0.0
 cycler==0.12.1
 ddgs==9.14.4
 deep-translator==1.11.4
+duckduckgo_search==8.1.1
 fake-useragent==2.2.0
 fastapi==0.141.1
 filelock==3.32.2
@@ -69,6 +70,9 @@ pymupdf==1.28.2
 pyparsing==3.3.2
 pypdf==6.15.0
 pypdfium2==5.12.1
+PySide6==6.11.1
+PySide6_Addons==6.11.1
+PySide6_Essentials==6.11.1
 pytesseract==0.3.13
 python-bidi==0.6.11
 python-dateutil==2.9.0.post0
@@ -85,6 +89,7 @@ sentencepiece==0.2.2
 setuptools==83.0.0
 shap==0.52.0
 shellingham==1.5.4
+shiboken6==6.11.1
 six==1.17.0
 sklearn-compat==0.1.6
 slicer==0.0.8
