@@ -1,6 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Set
 
 # ۱. تعریف کلاس سه‌تایی (Triplet)
 class Triplet:
@@ -49,7 +49,23 @@ class KnowledgeGraph:
             
         return neighbors
 
-        
+    # ==========================================
+    # اضافه شدن فیچر جدید: موتور استنتاج و مسیریابی
+    # ==========================================
+    def find_paths(self, source: str, target: str) -> List[List[str]]:
+        """یافتن تمام مسیرهای ساده ممکن بین دو موجودیت"""
+        if source not in self.entities or target not in self.entities:
+            return []
+        # استفاده از الگوریتم NetworkX برای یافتن تمام مسیرها
+        return list(nx.all_simple_paths(self.graph, source=source, target=target))
+
+    def analyze_impact(self, source_entity: str) -> Set[str]:
+        """تحلیل اثرپذیری: چه موجودیت‌هایی تحت تاثیر این گره قرار دارند؟"""
+        if source_entity not in self.entities:
+            return set()
+        # استفاده از پیمایش گراف (Descendants) برای یافتن تمام گره‌های پایین‌دست
+        return nx.descendants(self.graph, source_entity)
+
     def visualize(self, filename: str = "smartbiz_kg.png"):
         """رسم گراف دانش، ذخیره به‌صورت PNG و نمایش آن"""
         plt.figure(figsize=(12, 8))
@@ -93,12 +109,15 @@ kg.add_triplet("Supplier_Alpha", "Located_In", "Region_Risk_Zone")
 
 # تست استخراج همسایه‌ها برای یک موجودیت
 print("--- همسایه‌ها و روابط موجودیت Turbine_Blade ---")
-for rel, entity in kg.get_neighbors("Turbine_Blade"):
-    print(f"Turbine_Blade {rel} {entity}")
+paths = kg.find_paths("Supplier_Alpha", "Ti-6Al-4V")
+for p in paths:
+    print(" -> ".join(p))
 
-print(f"\nتعداد کل موجودیت‌ها (Entities): {len(kg.entities)}")
-print(f"تعداد کل روابط (Relations): {len(kg.relations)}")
-print(f"تعداد کل گزاره‌ها (Triplets): {len(kg.triplets)}")
+# --- تست ۲: تحلیل اثر بحران (Impact Analysis) ---
+risk_node = "Supplier_Alpha"
+print(f"\n--- تست استنتاج ۲: تحلیل اثر بحران در '{risk_node}' ---")
+affected_entities = kg.analyze_impact(risk_node)
+print(f"موجودیت‌هایی که تحت تأثیر بحران این گره قرار می‌گیرند: {affected_entities}")
 
-# تست بصری (باز شدن پنجره گراف)
+# رسم گراف نهایی
 kg.visualize()
