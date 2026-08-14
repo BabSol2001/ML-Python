@@ -51,24 +51,30 @@ class KnowledgeGraph:
         return neighbors
 
     # ==========================================
-    # اضافه شدن فیچر جدید: موتور استنتاج و مسیریابی
+    # موتور استنتاج و مسیریابی
     # ==========================================
     def find_paths(self, source: str, target: str) -> List[List[str]]:
         """یافتن تمام مسیرهای ساده ممکن بین دو موجودیت"""
         if source not in self.entities or target not in self.entities:
             return []
-        # استفاده از الگوریتم NetworkX برای یافتن تمام مسیرها
         return list(nx.all_simple_paths(self.graph, source=source, target=target))
 
     def analyze_impact(self, source_entity: str) -> Set[str]:
         """تحلیل اثرپذیری: چه موجودیت‌هایی تحت تاثیر این گره قرار دارند؟"""
         if source_entity not in self.entities:
             return set()
-        # استفاده از پیمایش گراف (Descendants) برای یافتن تمام گره‌های پایین‌دست
         return nx.descendants(self.graph, source_entity)
 
+    def get_subgraph_triplets(self, entities_subset: Set[str]) -> List[Triplet]:
+        """استخراج سه‌تایی‌های مربوط به یک زیرگراف خاص (برای استفاده در Graph-RAG)"""
+        sub_triplets = []
+        for t in self.triplets:
+            if t.head in entities_subset or t.tail in entities_subset:
+                sub_triplets.append(t)
+        return sub_triplets
+
     # ==========================================
-    # اضافه شده در گام ۳: رسم تعاملی و داشبورد HTML
+    # رسم تعاملی و داشبورد HTML
     # ==========================================
     def visualize_interactive(self, filename: str = "smartbiz_kg_interactive.html", highlight_risk_from: Optional[str] = None):
         """رسم تعاملی گراف در قالب فایل وب HTML با قابلیت کشیدن، زوم و هایلایت بحران"""
@@ -107,27 +113,63 @@ class KnowledgeGraph:
         plt.figure(figsize=(12, 8))
         pos = nx.spring_layout(self.graph, k=0.8)
         
-        # رسم گره‌ها و یال‌ها
         nx.draw_networkx_nodes(self.graph, pos, node_size=2500, node_color='lightblue')
         nx.draw_networkx_labels(self.graph, pos, font_size=9, font_weight='bold')
         nx.draw_networkx_edges(self.graph, pos, arrowstyle='->', arrowsize=20, edge_color='gray')
         
-        # برچسب روی یال‌ها (روابط)
         edge_labels = nx.get_edge_attributes(self.graph, 'relation')
         nx.draw_networkx_edge_labels(self.graph, pos, edge_labels=edge_labels, font_color='red')
         
         plt.title("SmartBiz-KG: Knowledge Graph MVP", fontsize=14)
         plt.axis('off')
         
-        # ۱. ذخیره فایل تصویر با کیفیت بالا (DPI 300) قبل از نمایش
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         print(f"\n[+] تصویر گراف با موفقیت در فایل '{filename}' ذخیره شد.")
-        
-        # ۲. نمایش پنجره
         plt.show()
-    
+
 # ==========================================
-# ۳. بارگذاری داده‌های اولیه پروژه (تولید + کسب‌وکار)
+# ۳. عامل Graph-RAG برای تولید گزارش متنی
+# ==========================================
+class GraphRAGAgent:
+    def __init__(self, kg: KnowledgeGraph):
+        self.kg = kg
+
+    def query_impact_report(self, risk_entity: str) -> str:
+        """تولید گزارش تحلیلی اثرات بحران بر اساس بازیابی گراف دانش (Graph-RAG)"""
+        if risk_entity not in self.kg.entities:
+            return f"خطا: موجودیت '{risk_entity}' در گراف دانش یافت نشد."
+
+        affected_nodes = self.kg.analyze_impact(risk_entity)
+        related_entities = affected_nodes.union({risk_entity})
+        sub_triplets = self.kg.get_subgraph_triplets(related_entities)
+
+        # ساخت کانتکست ساختاریافته (Graph Context Retrieval)
+        context_str = "\n".join([f"- {t.head} -> [{t.relation}] -> {t.tail}" for t in sub_triplets])
+
+        # قالب‌بندی گزارش نهایی
+        report = f"""
+==================================================
+📊 گزارش هوشمند Graph-RAG: تحلیل ریسک و اثرات بحران
+==================================================
+🎯 منبع ریسک بررسی‌شده: {risk_entity}
+📉 تعداد موجودیت‌های متأثر مستقیم/غیرمستقیم: {len(affected_nodes)}
+
+🔍 حقایق استخراج‌شده از گراف (Knowledge Graph Context):
+{context_str}
+
+💡 تحلیل مدیریتی و زنجیره اثرات:
+بر اساس گراف دانش، هرگونه بروز ریسک یا اختلال در '{risk_entity}' به‌صورت زنجیره‌ای موارد زیر را تحت تاثیر قرار می‌دهد:
+"""
+        for node in affected_nodes:
+            paths = self.kg.find_paths(risk_entity, node)
+            if paths:
+                path_str = " -> ".join(paths[0])
+                report += f"  • آسیب به [{node}] از طریق مسیر: ({path_str})\n"
+
+        return report
+
+# ==========================================
+# ۴. بارگذاری داده‌های اولیه پروژه (تولید + کسب‌وکار)
 # ==========================================
 kg = KnowledgeGraph()
 
@@ -157,6 +199,11 @@ risk_node = "Supplier_Alpha"
 print(f"\n--- تست استنتاج ۲: تحلیل اثر بحران در '{risk_node}' ---")
 affected_entities = kg.analyze_impact(risk_node)
 print(f"موجودیت‌هایی که تحت تأثیر بحران این گره قرار می‌گیرند: {affected_entities}")
+
+# --- تست ۳: فراخوانی Graph-RAG Agent و چاپ گزارش متنی ---
+rag_agent = GraphRAGAgent(kg)
+report_output = rag_agent.query_impact_report(risk_node)
+print(report_output)
 
 # رسم گراف نهایی
 kg.visualize()
