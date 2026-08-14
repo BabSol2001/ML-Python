@@ -1,6 +1,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict, Set
+from pyvis.network import Network
+from typing import List, Tuple, Dict, Set, Optional
 
 # ۱. تعریف کلاس سه‌تایی (Triplet)
 class Triplet:
@@ -66,6 +67,41 @@ class KnowledgeGraph:
         # استفاده از پیمایش گراف (Descendants) برای یافتن تمام گره‌های پایین‌دست
         return nx.descendants(self.graph, source_entity)
 
+    # ==========================================
+    # اضافه شده در گام ۳: رسم تعاملی و داشبورد HTML
+    # ==========================================
+    def visualize_interactive(self, filename: str = "smartbiz_kg_interactive.html", highlight_risk_from: Optional[str] = None):
+        """رسم تعاملی گراف در قالب فایل وب HTML با قابلیت کشیدن، زوم و هایلایت بحران"""
+        net = Network(height="750px", width="100%", notebook=False, directed=True)
+        
+        # محاسبه گره‌های تحت ریسک در صورت فعال بودن هایلایت
+        affected_nodes = set()
+        if highlight_risk_from and highlight_risk_from in self.entities:
+            affected_nodes = self.analyze_impact(highlight_risk_from)
+
+        # افزودن گره‌ها با رنگ‌بندی هوشمند
+        for node in self.graph.nodes():
+            if node == highlight_risk_from:
+                color = "#ff4d4d"  # قرمز: منبع اصلی ریسک/بحران
+                title = f"<b>CRITICAL RISK SOURCE</b><br>{node}"
+            elif node in affected_nodes:
+                color = "#ffa64d"  # نارنجی: گره‌های متأثر از بحران
+                title = f"<b>AFFECTED NODE</b><br>{node}"
+            else:
+                color = "#97c2fc"  # آبی: حالت عادی
+                title = f"Node: {node}"
+                
+            net.add_node(node, label=node, title=title, color=color, shape="ellipse")
+
+        # افزودن یال‌ها و برچسب روابط
+        for u, v, data in self.graph.edges(data=True):
+            net.add_edge(u, v, title=data.get('relation', ''), label=data.get('relation', ''), color="gray")
+
+        # تنظیمات فیزیک برای حرکت نرم گره‌ها
+        net.toggle_physics(True)
+        net.write_html(filename)
+        print(f"\n[+] داشبورد تعاملی با موفقیت در فایل '{filename}' ذخیره شد.")
+
     def visualize(self, filename: str = "smartbiz_kg.png"):
         """رسم گراف دانش، ذخیره به‌صورت PNG و نمایش آن"""
         plt.figure(figsize=(12, 8))
@@ -106,6 +142,9 @@ kg.add_triplet("Turbine_Blade", "Requires_Process", "High_Precision_Grinding")
 kg.add_triplet("Supplier_Alpha", "Supplies", "Ti-6Al-4V")
 kg.add_triplet("Customer_Boeing", "Orders", "Turbine_Blade")
 kg.add_triplet("Supplier_Alpha", "Located_In", "Region_Risk_Zone")
+
+# اجرا و تولید داشبورد تعاملی با هایلایت کردن ریسک Supplier_Alpha
+kg.visualize_interactive(filename="smartbiz_kg_interactive.html", highlight_risk_from="Supplier_Alpha")
 
 # تست استخراج همسایه‌ها برای یک موجودیت
 print("--- همسایه‌ها و روابط موجودیت Turbine_Blade ---")
