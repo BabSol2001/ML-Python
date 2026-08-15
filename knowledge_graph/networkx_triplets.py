@@ -39,11 +39,9 @@ class KnowledgeGraph:
             return []
         
         neighbors = []
-        # روابط خروجی
         for neighbor in self.graph.successors(entity):
             rel = self.graph[entity][neighbor]['relation']
             neighbors.append((f"OUT: --[{rel}]-->", neighbor))
-        # روابط ورودی
         for neighbor in self.graph.predecessors(entity):
             rel = self.graph[neighbor][entity]['relation']
             neighbors.append((f"IN: <--[{rel}]--", neighbor))
@@ -80,12 +78,10 @@ class KnowledgeGraph:
         """رسم تعاملی گراف در قالب فایل وب HTML با قابلیت کشیدن، زوم و هایلایت بحران"""
         net = Network(height="750px", width="100%", notebook=False, directed=True)
         
-        # محاسبه گره‌های تحت ریسک در صورت فعال بودن هایلایت
         affected_nodes = set()
         if highlight_risk_from and highlight_risk_from in self.entities:
             affected_nodes = self.analyze_impact(highlight_risk_from)
 
-        # افزودن گره‌ها با رنگ‌بندی هوشمند
         for node in self.graph.nodes():
             if node == highlight_risk_from:
                 color = "#ff4d4d"  # قرمز: منبع اصلی ریسک/بحران
@@ -99,11 +95,9 @@ class KnowledgeGraph:
                 
             net.add_node(node, label=node, title=title, color=color, shape="ellipse")
 
-        # افزودن یال‌ها و برچسب روابط
         for u, v, data in self.graph.edges(data=True):
             net.add_edge(u, v, title=data.get('relation', ''), label=data.get('relation', ''), color="gray")
 
-        # تنظیمات فیزیک برای حرکت نرم گره‌ها
         net.toggle_physics(True)
         net.write_html(filename)
         print(f"\n[+] داشبورد تعاملی با موفقیت در فایل '{filename}' ذخیره شد.")
@@ -128,14 +122,13 @@ class KnowledgeGraph:
         plt.show()
 
 # ==========================================
-# ۳. عامل Graph-RAG برای تولید گزارش متنی
+# ۳. عامل پایه Graph-RAG
 # ==========================================
 class GraphRAGAgent:
     def __init__(self, kg: KnowledgeGraph):
         self.kg = kg
 
     def query_impact_report(self, risk_entity: str) -> str:
-        """تولید گزارش تحلیلی اثرات بحران بر اساس بازیابی گراف دانش (Graph-RAG)"""
         if risk_entity not in self.kg.entities:
             return f"خطا: موجودیت '{risk_entity}' در گراف دانش یافت نشد."
 
@@ -143,10 +136,8 @@ class GraphRAGAgent:
         related_entities = affected_nodes.union({risk_entity})
         sub_triplets = self.kg.get_subgraph_triplets(related_entities)
 
-        # ساخت کانتکست ساختاریافته (Graph Context Retrieval)
         context_str = "\n".join([f"- {t.head} -> [{t.relation}] -> {t.tail}" for t in sub_triplets])
 
-        # قالب‌بندی گزارش نهایی
         report = f"""
 ==================================================
 📊 گزارش هوشمند Graph-RAG: تحلیل ریسک و اثرات بحران
@@ -168,42 +159,39 @@ class GraphRAGAgent:
 
         return report
 
-# ==========================================
-# ۴. بارگذاری داده‌های اولیه پروژه (تولید + کسب‌وکار)
-# ==========================================
-kg = KnowledgeGraph()
+# تابع کمکی برای مقداردهی گراف نمونه
+def build_sample_kg() -> KnowledgeGraph:
+    kg = KnowledgeGraph()
+    # مهندسی / تولید
+    kg.add_triplet("High_Infeed_Rate", "Increases", "Grinding_Temp")
+    kg.add_triplet("Grinding_Temp", "Causes", "Thermal_Burn")
+    kg.add_triplet("Thermal_Burn", "Reduces", "Fatigue_Life")
+    kg.add_triplet("Ti-6Al-4V", "Used_In", "Turbine_Blade")
+    kg.add_triplet("Turbine_Blade", "Requires_Process", "High_Precision_Grinding")
+    # کسب‌وکار / تامین
+    kg.add_triplet("Supplier_Alpha", "Supplies", "Ti-6Al-4V")
+    kg.add_triplet("Customer_Boeing", "Orders", "Turbine_Blade")
+    kg.add_triplet("Supplier_Alpha", "Located_In", "Region_Risk_Zone")
+    return kg
 
-# داده‌های بخش مهندسی/تولید
-kg.add_triplet("High_Infeed_Rate", "Increases", "Grinding_Temp")
-kg.add_triplet("Grinding_Temp", "Causes", "Thermal_Burn")
-kg.add_triplet("Thermal_Burn", "Reduces", "Fatigue_Life")
-kg.add_triplet("Ti-6Al-4V", "Used_In", "Turbine_Blade")
-kg.add_triplet("Turbine_Blade", "Requires_Process", "High_Precision_Grinding")
 
-# داده‌های بخش کسب‌وکار و زنجیره تامین
-kg.add_triplet("Supplier_Alpha", "Supplies", "Ti-6Al-4V")
-kg.add_triplet("Customer_Boeing", "Orders", "Turbine_Blade")
-kg.add_triplet("Supplier_Alpha", "Located_In", "Region_Risk_Zone")
+# اجرا فقط هنگامی که این فایل مستقیماً اجرا شود
+if __name__ == "__main__":
+    kg = build_sample_kg()
+    kg.visualize_interactive(filename="smartbiz_kg_interactive.html", highlight_risk_from="Supplier_Alpha")
 
-# اجرا و تولید داشبورد تعاملی با هایلایت کردن ریسک Supplier_Alpha
-kg.visualize_interactive(filename="smartbiz_kg_interactive.html", highlight_risk_from="Supplier_Alpha")
+    print("--- همسایه‌ها و روابط موجودیت Turbine_Blade ---")
+    paths = kg.find_paths("Supplier_Alpha", "Ti-6Al-4V")
+    for p in paths:
+        print(" -> ".join(p))
 
-# تست استخراج همسایه‌ها برای یک موجودیت
-print("--- همسایه‌ها و روابط موجودیت Turbine_Blade ---")
-paths = kg.find_paths("Supplier_Alpha", "Ti-6Al-4V")
-for p in paths:
-    print(" -> ".join(p))
+    risk_node = "Supplier_Alpha"
+    print(f"\n--- تست استنتاج ۲: تحلیل اثر بحران در '{risk_node}' ---")
+    affected_entities = kg.analyze_impact(risk_node)
+    print(f"موجودیت‌هایی که تحت تأثیر بحران این گره قرار می‌گیرند: {affected_entities}")
 
-# --- تست ۲: تحلیل اثر بحران (Impact Analysis) ---
-risk_node = "Supplier_Alpha"
-print(f"\n--- تست استنتاج ۲: تحلیل اثر بحران در '{risk_node}' ---")
-affected_entities = kg.analyze_impact(risk_node)
-print(f"موجودیت‌هایی که تحت تأثیر بحران این گره قرار می‌گیرند: {affected_entities}")
+    rag_agent = GraphRAGAgent(kg)
+    report_output = rag_agent.query_impact_report(risk_node)
+    print(report_output)
 
-# --- تست ۳: فراخوانی Graph-RAG Agent و چاپ گزارش متنی ---
-rag_agent = GraphRAGAgent(kg)
-report_output = rag_agent.query_impact_report(risk_node)
-print(report_output)
-
-# رسم گراف نهایی
-kg.visualize()
+    kg.visualize()
