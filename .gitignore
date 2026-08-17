@@ -2,7 +2,8 @@
 .venv/
 venv/
 env/
-
+.env
+knowledge_graph/.env
 # فایل‌های کش پایتون
 __pycache__/
 *.pyc

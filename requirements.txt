@@ -93,6 +93,7 @@ PySide6_Essentials==6.11.1
 pytesseract==0.3.13
 python-bidi==0.6.11
 python-dateutil==2.9.0.post0
+python-dotenv==1.2.2
 python-multipart==0.0.32
 pytz==2026.3.post1
 pyvis==0.3.2
