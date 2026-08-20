@@ -1,4 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Babak/ML Python/MLP/Flutter/windows",
+    "cmake.sourceDirectory": "C:/Babak/ML_Python/finetuning/flutter_ft/windows",
     "python-envs.defaultEnvManager": "ms-python.python:venv"
 }

@@ -1,0 +1,13 @@
+services:
+  dgl:
+    build: .
+    image: dgl_env:latest
+    container_name: dgl_container
+    volumes:
+      - .:/workspace
+    environment:
+      - DGL_DISABLE_GRAPHBOLT=1
+      - DGLBACKEND=pytorch
+    stdin_open: true
+    tty: true
+    working_dir: /workspace

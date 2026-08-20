@@ -1,6 +1,8 @@
 # محیط‌های مجازی
 .venv/
 venv/
+.venv_linux/
+venv_linux/
 env/
 .env
 knowledge_graph/.env
@@ -15,9 +17,10 @@ __pycache__/
 Thumbs.db
 
 # وزن‌های سنگین مدل‌ها (اختیاری - در صورت تمایل می‌توانید کامنتش کنید)
-# *.pth
-# *.pkl
+*.pth
+*.pkl
 *.pt
+*.exe
 dataset/
 
 # پوشه اصلی خروجی‌های فلاتر
