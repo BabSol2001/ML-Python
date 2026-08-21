@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dgl-pod
+  labels:
+    app: dgl
+spec:
+  containers:
+  - name: dgl-container
+    image: dgl_env_imprvd:latest
+    imagePullPolicy: IfNotPresent
+    tty: true
+    stdin: true
+    workingDir: /workspace
+    env:
+    - name: DGL_DISABLE_GRAPHBOLT
+      value: "1"
+    - name: DGLBACKEND
+      value: "pytorch"
+    volumeMounts:
+    - mountPath: /workspace
+      name: project-volume
+  volumes:
+  - name: project-volume
+    hostPath:
+      path: /host_mnt/c/Babak/ML_Python/finetuning/DGL
+      type: DirectoryOrCreate

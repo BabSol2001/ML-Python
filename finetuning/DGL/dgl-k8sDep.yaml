@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dgl-deployment
+  labels:
+    app: dgl-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dgl-service
+  template:
+    metadata:
+      labels:
+        app: dgl-service
+    spec:
+      containers:
+      - name: dgl-container
+        image: dgl_env_imprvd:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DGL_DISABLE_GRAPHBOLT
+          value: "1"
+        - name: DGLBACKEND
+          value: "pytorch"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dgl-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: dgl-service

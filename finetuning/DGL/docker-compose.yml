@@ -1,8 +1,8 @@
 services:
   dgl:
     build: .
-    image: dgl_env:latest
-    container_name: dgl_container
+    image: dgl_env_imprvd:latest
+    container_name: dgl_container__imprvd
     volumes:
       - .:/workspace
     environment:

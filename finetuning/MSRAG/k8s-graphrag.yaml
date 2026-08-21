@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphrag-deployment
+  labels:
+    app: ms-graphrag
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-graphrag
+  template:
+    metadata:
+      labels:
+        app: ms-graphrag
+    spec:
+      containers:
+      - name: graphrag-container
+        image: graphrag_env:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8002
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphrag-service
+spec:
+  type: NodePort
+  ports:
+  - port: 8002
+    targetPort: 8002
+    nodePort: 30802
+  selector:
+    app: ms-graphrag

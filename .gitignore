@@ -3,18 +3,26 @@
 venv/
 .venv_linux/
 venv_linux/
+ENV/
 env/
 .env
+.env.local
+*.pem
+*.key
+
 knowledge_graph/.env
 # فایل‌های کش پایتون
 __pycache__/
 *.pyc
 *.pyo
+*.py[cod]
+*$py.class
 
 # فایل‌های موقت VS Code و سیستم‌عامل
 .vscode/
 .DS_Store
 Thumbs.db
+.idea/
 
 # وزن‌های سنگین مدل‌ها (اختیاری - در صورت تمایل می‌توانید کامنتش کنید)
 *.pth
@@ -45,3 +53,15 @@ build/
 *.png
 MLP/data/
 *.tar.gz
+*.so
+*.dylib
+*.dll
+*.bin
+*.pt
+*.pth
+
+# ==========================================
+# Docker & Kubernetes Logs
+# ==========================================
+*.log
+docker-compose.override.yml

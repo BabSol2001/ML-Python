@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  ms-graphrag:
+    build: .
+    image: graphrag_env:latest
+    container_name: graphrag_container
+    ports:
+      - "8002:8002"
+    volumes:
+      - .:/workspace
+    restart: always
