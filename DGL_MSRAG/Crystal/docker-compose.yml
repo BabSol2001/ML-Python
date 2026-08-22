@@ -1,0 +1,12 @@
+services:
+  solid-state-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: solid_state_ai:v1
+    container_name: solid_state_container
+    ports:
+      - "8003:8003"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

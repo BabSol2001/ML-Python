@@ -1,0 +1,12 @@
+services:
+  fluid-energy-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fld_enrg_ai:v1
+    container_name: fld_enrg_container
+    ports:
+      - "8005:8005" # مپ کردن پورت 8005 سیستم به پورت 8005 داخل کانتینر
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

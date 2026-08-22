@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prdctv-mtn-deployment
+  labels:
+    app: prdctv-mtn-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prdctv-mtn-ai
+  template:
+    metadata:
+      labels:
+        app: prdctv-mtn-ai
+    spec:
+      containers:
+      - name: prdctv-mtn-container
+        image: prdctv_mtn_ai:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prdctv-mtn-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8004
+    targetPort: 8000
+  selector:
+    app: prdctv-mtn-ai

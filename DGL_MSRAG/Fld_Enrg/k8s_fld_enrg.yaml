@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fld-enrg-deployment
+  labels:
+    app: fld-enrg-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fld-enrg-ai
+  template:
+    metadata:
+      labels:
+        app: fld-enrg-ai
+    spec:
+      containers:
+      - name: fld-enrg-container
+        image: fld_enrg_ai:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8005
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fld-enrg-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8005
+    targetPort: 8005
+  selector:
+    app: fld-enrg-ai

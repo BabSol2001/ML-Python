@@ -1,0 +1,12 @@
+services:
+  predictive-maintenance-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: prdctv_mtn_ai:v1
+    container_name: prdctv_mtn_container
+    ports:
+      - "8004:8000" # مپ کردن پورت 8004 سیستم به پورت 8000 داخل کانتینر
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
