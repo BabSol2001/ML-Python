@@ -1,0 +1,16 @@
+[
+  {
+    "source": "User",
+    "relation": "drinks",
+    "target": "Coffee",
+    "created_at": 1787379886.0248628,
+    "invalidated_at": 1787379887.0254116
+  },
+  {
+    "source": "User",
+    "relation": "drinks",
+    "target": "Green Tea",
+    "created_at": 1787379887.0254116,
+    "invalidated_at": null
+  }
+]
