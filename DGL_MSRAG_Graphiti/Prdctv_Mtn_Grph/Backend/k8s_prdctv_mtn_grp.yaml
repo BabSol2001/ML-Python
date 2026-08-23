@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prdctv-mtn-grp-deployment
+  labels:
+    app: prdctv-mtn-grp-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prdctv-mtn-grp-ai
+  template:
+    metadata:
+      labels:
+        app: prdctv-mtn-grp-ai
+    spec:
+      containers:
+      - name: prdctv-mtn-grp-container
+        image: prdctv_mtn_ai:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8007
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prdctv-mtn-grp-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8007
+    targetPort: 8000
+  selector:
+    app: prdctv-mtn-grp-ai

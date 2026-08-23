@@ -1,0 +1,12 @@
+services:
+  predictive-maintenance-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: prdctv_mtn_grp_ai:v1
+    container_name: prdctv_mtn_grp_container
+    ports:
+      - "8007:8007"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
