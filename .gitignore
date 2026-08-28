@@ -59,6 +59,9 @@ MLP/data/
 *.bin
 *.pt
 *.pth
+*.bin
+*.mp4
+*.avi
 
 # ==========================================
 # Docker & Kubernetes Logs

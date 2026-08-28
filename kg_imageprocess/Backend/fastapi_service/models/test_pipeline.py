@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from typing import List, Optional
 import mediapipe as mp
+from mediapipe.python.solutions import pose as mp_pose # type: ignore # ایمپورت مستقیم ساب‌ماژول
 
 # بارگذاری ماژول STGCNLoader که در مراحل قبلی توسعه داده شد
 from models.st_gcn_loader import STGCNLoader
@@ -13,8 +14,8 @@ class MediaPipePoseExtractor:
     استخراج مفاصل از ویدیو با استفاده از MediaPipe و نگاشت آن به فرمت استاندارد COCO-17
     """
     def __init__(self):
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
+        # استفاده مستقیم از mp_pose
+        self.pose = mp_pose.Pose(
             static_image_mode=False,
             model_complexity=1,
             smooth_landmarks=True,
