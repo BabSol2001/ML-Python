@@ -6,6 +6,8 @@ metadata:
     app: neo4j-gds
 spec:
   replicas: 1
+  strategy:
+    type: Recreate  # 👈 اجبار به بستن پاد قدیمی قبل از ساخت پاد جدید (جلوگیری از کمبود منابع)
   selector:
     matchLabels:
       app: neo4j-gds
@@ -16,7 +18,7 @@ spec:
     spec:
       containers:
       - name: neo4j-gds
-        image: neo4j:5.15-enterprise
+        image: neo4j:5.26.0-enterprise
         env:
         - name: NEO4J_AUTH
           value: "neo4j/password123"
@@ -26,6 +28,10 @@ spec:
           value: "yes"
         - name: NEO4J_server_config_strict__validation_enabled
           value: "false"
+        - name: NEO4J_cypher_default__language__version
+          value: "CYPHER 2025"
+        - name: NEO4J_internal_dbms_cypher__gql__support__enabled
+          value: "true"
         ports:
         - containerPort: 7474
           name: http
@@ -33,7 +39,7 @@ spec:
           name: bolt
         resources:
           requests:
-            memory: "1Gi"
+            memory: "1Gi"  # 👈 سبک‌تر برای محیط لوکال
             cpu: "500m"
           limits:
             memory: "2Gi"

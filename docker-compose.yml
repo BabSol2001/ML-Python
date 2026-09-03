@@ -1,7 +1,7 @@
 services:
   # ۱. سرویس دیتابیس صنعتی گراف Neo4j به همراه پلاگین GDS
   neo4j-gds:
-    image: neo4j:5.15.0-enterprise
+    image: neo4j:5.2.0-enterprise
     container_name: neo4j_gds_container
     ports:
       - "7475:7474"
