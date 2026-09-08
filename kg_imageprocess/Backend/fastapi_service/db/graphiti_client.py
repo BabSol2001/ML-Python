@@ -69,7 +69,8 @@ class GraphitiClient:
             self._graphiti = Graphiti(
                 graph_driver=self._driver,
                 llm_client=llm_client,
-                embedder=embedder_client
+                embedder=embedder_client,
+                cross_encoder=None
             )
             
             try:
@@ -107,7 +108,7 @@ class GraphitiClient:
             group_id=user_id
         )
 
-async def search_user_memory(
+    async def search_user_memory(
         self,
         user_id: str,
         query: str,
@@ -181,6 +182,5 @@ async def search_user_memory(
                 print(f"⚠️ خطای بازیابی مستقیم Cypher: {e}")
 
         return memory_facts
-
 
 graphiti_client = GraphitiClient()
