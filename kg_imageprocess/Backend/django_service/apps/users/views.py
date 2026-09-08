@@ -3,9 +3,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
-from .models import User, BiomechanicalSession, FrameAnalysis
+from .models import User, UserProfile, BiomechanicalSession, FrameAnalysis
 from .serializers import (
     AthleteContextSerializer,
+    UserProfileSerializer,
     BiomechanicalSessionSerializer,
     FrameAnalysisSerializer
 )
@@ -13,12 +14,38 @@ from .serializers import (
 
 class InternalAthleteContextView(APIView):
     """
-    اندپوینت اختصاصی دریافت Context ورزشکار برای سرویس FastAPI و آنتولوژی
+    اندپوینت اختصاصی دریافت Context کامل ورزشکار برای سرویس FastAPI و آنتولوژی
     """
     def get(self, request, user_id):
         user = get_object_or_404(User, id=user_id)
         serializer = AthleteContextSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserProfileView(APIView):
+    """
+    اندپوینت دریافت و ویرایش پروفایل جامع بیومکانیکی کاربر (دیدگاه مشاور/ورزشکار)
+    """
+    def get(self, request, user_id):
+        profile = get_object_or_404(UserProfile, user_id=user_id)
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, user_id):
+        profile = get_object_or_404(UserProfile, user_id=user_id)
+        serializer = UserProfileSerializer(profile, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, user_id):
+        profile = get_object_or_404(UserProfile, user_id=user_id)
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class BiomechanicalSessionViewSet(viewsets.ModelViewSet):
