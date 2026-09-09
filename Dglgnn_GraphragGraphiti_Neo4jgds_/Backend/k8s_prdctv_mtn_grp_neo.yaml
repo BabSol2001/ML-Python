@@ -1,3 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neo4j-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi  # میزان فضای اختصاص داده شده روی هارد شما
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,7 +18,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate  # 👈 اجبار به بستن پاد قدیمی قبل از ساخت پاد جدید (جلوگیری از کمبود منابع)
+    type: Recreate
   selector:
     matchLabels:
       app: neo4j-gds
@@ -39,8 +50,15 @@ spec:
           name: bolt
         resources:
           requests:
-            memory: "1Gi"  # 👈 سبک‌تر برای محیط لوکال
+            memory: "1Gi"
             cpu: "500m"
           limits:
             memory: "2Gi"
             cpu: "1500m"
+        volumeMounts:               # 👈 اتصال دیسک به کانتینر
+        - name: neo4j-data-volume
+          mountPath: /data          # پوشه نگهداری داده‌های اصلی دیتابیس
+      volumes:                      # 👈 تعریف دیسک بر اساس PVC ساخته شده
+      - name: neo4j-data-volume
+        persistentVolumeClaim:
+          claimName: neo4j-data-pvc

@@ -1,15 +1,39 @@
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.serializers import BaseSerializer
 from django.shortcuts import get_object_or_404
 
 from .models import User, UserProfile, BiomechanicalSession, FrameAnalysis
 from .serializers import (
+    UserCreateSerializer,
     AthleteContextSerializer,
     UserProfileSerializer,
     BiomechanicalSessionSerializer,
     FrameAnalysisSerializer
 )
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    ایجاد (ثبت‌نام)، مشاهده و مدیریت کامل کاربران
+    """
+    queryset = User.objects.all()
+    serializer_class = UserCreateSerializer
+
+    def get_serializer_class(self) -> type[BaseSerializer]: # type: ignore[override]
+        if self.action in ['retrieve', 'list']:
+            return AthleteContextSerializer
+        return UserCreateSerializer
+
+
+class UserProfileViewSet(viewsets.ModelViewSet):
+    """
+    مشاهده و ویرایش پروفایل‌های کاربران بر اساس user_id
+    """
+    queryset = UserProfile.objects.all()
+    serializer_class = UserProfileSerializer
+    lookup_field = 'user_id'
 
 
 class InternalAthleteContextView(APIView):
@@ -24,7 +48,7 @@ class InternalAthleteContextView(APIView):
 
 class UserProfileView(APIView):
     """
-    اندپوینت دریافت و ویرایش پروفایل جامع بیومکانیکی کاربر (دیدگاه مشاور/ورزشکار)
+    اندپوینت دریافت و ویرایش مستقیم پروفایل جامع بیومکانیکی کاربر بر اساس user_id
     """
     def get(self, request, user_id):
         profile = get_object_or_404(UserProfile, user_id=user_id)
