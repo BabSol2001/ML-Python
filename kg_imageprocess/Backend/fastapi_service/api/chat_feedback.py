@@ -10,8 +10,13 @@ async def get_post_workout_feedback(request: ChatRequest):
     اندپوینت دریافت تحلیل عمیق مربیگری پس از تمرین با استفاده از MS-RAG و Graphiti
     """
     try:
+        # استخراج session_id از request (در صورت وجود، وگرنه مقدار پیش‌فرض یا خالی)
+        session_id = getattr(request, "session_id", None) or ""
+
+        # ارسال user_id، session_id و user_message به سرویس RAG
         reply, retrieved_facts = await rag_service.generate_coaching_feedback(
             user_id=request.user_id,
+            session_id=session_id,
             user_message=request.message
         )
 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -8,8 +9,8 @@ from schemas.pose_schema import PoseFramePayload, PoseFeedbackResponse
 from core.rule_engine import check_squat_rules
 from core.pose_calculator import calculate_angle_2d
 from services.django_client import fetch_athlete_context, check_user_subscription_status
-from ..db.neo4j_client import neo4j_client
-from ..db.graphiti_client import graphiti_client
+from db.neo4j_client import neo4j_client
+from db.graphiti_client import graphiti_client
 
 logger = logging.getLogger("WebSocketPose")
 router = APIRouter()
@@ -40,16 +41,16 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
 
     # ۲. استعلام وضعیت اشتراک و سقف استفاده از اپلیکیشن payments جانگو
     sub_check = await check_user_subscription_status(user_id)
-    if not sub_check["is_allowed"]:
+    if not sub_check.get("is_allowed", True):
         error_payload = {
             "error": "SUBSCRIPTION_EXPIRED",
-            "message": sub_check["reason"],
-            "remaining_analyses": sub_check["remaining_analyses"]
+            "message": sub_check.get("reason", "اشتراک شما به پایان رسیده است."),
+            "remaining_analyses": sub_check.get("remaining_analyses", 0)
         }
         await websocket.send_text(json.dumps(error_payload))
         manager.disconnect(websocket)
         await websocket.close(code=4003)
-        logger.warning(f"⛔ عدم اجازه اتصال به کاربر {user_id}: {sub_check['reason']}")
+        logger.warning(f"⛔ عدم اجازه اتصال به کاربر {user_id}: {sub_check.get('reason')}")
         return
 
     # ۳. دریافت context جامع بیومکانیکی و سوابق پزشکی کاربر از جانگو
@@ -59,7 +60,7 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
     # ۴. ایجاد جلسه تمرین جدید (WorkoutSession) در Neo4j
     session_id = str(uuid.uuid4())
     try:
-        if neo4j_client._driver:
+        if getattr(neo4j_client, "_driver", None):
             await neo4j_client.create_session_node(
                 user_id=user_id, 
                 exercise_name="squat", 
@@ -87,7 +88,7 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
                 # ۶. استخراج زاویه واقعی زانو برای ثبت در گراف
                 keypoints_dict = {kp.id: (kp.x, kp.y) for kp in payload.keypoints if kp.score > 0.5}
                 knee_angle = 0.0
-                if all(k in keypoints_dict for k in [23, 25, 27]): # Hip, Knee, Ankle
+                if all(k in keypoints_dict for k in [23, 25, 27]):  # Hip, Knee, Ankle
                     knee_angle = calculate_angle_2d(
                         keypoints_dict[23], 
                         keypoints_dict[25], 
@@ -96,7 +97,7 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
 
                 # ۷. ثبت فریم و زاویه در Neo4j
                 try:
-                    if neo4j_client._driver:
+                    if getattr(neo4j_client, "_driver", None):
                         await neo4j_client.log_frame_analysis(
                             session_id=session_id,
                             frame_id=payload.frame_id,
@@ -107,20 +108,19 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
                 except Exception as e:
                     logger.error(f"خطا در ثبت فریم در Neo4j: {e}")
 
-                # ۸. ثبت فکت در Graphiti در صورت وجود خطای بیومکانیکی
+                # ۸. ثبت فکت در Graphiti به صورت پس‌زمینه (تا آنالیز لایو کند نشود)
                 if not feedback.is_valid and feedback.error_code:
-                    try:
-                        if graphiti_client._graphiti:
-                            await graphiti_client.log_biomechanical_fact(
+                    if getattr(graphiti_client, "_graphiti", None):
+                        asyncio.create_task(
+                            graphiti_client.log_biomechanical_fact(
                                 user_id=user_id,
                                 session_id=session_id,
                                 error_code=feedback.error_code,
                                 details=feedback.feedback_message
                             )
-                    except Exception as e:
-                        logger.error(f"خطا در ثبت فکت در Graphiti: {e}")
+                        )
 
-                # ۹. ارسال بازخورد آنی به کاربر
+                # ۹. ارسال فوری بازخورد آنی به کاربر
                 await websocket.send_text(feedback.model_dump_json())
 
             except ValidationError as e:

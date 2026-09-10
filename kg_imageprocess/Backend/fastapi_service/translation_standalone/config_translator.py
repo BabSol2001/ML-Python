@@ -30,8 +30,9 @@ class TranslationConfig:
     - "Range of Motion (ROM)" -> FA: "دامنه حرکتی" | DE: "Bewegungsausmaß (ROM)"
 
     --- DEVIATIONS & BIOMECHANICAL ISSUES ---
-    - "Knee Valgus" -> FA: "انحراف زانو به داخل (والگوس زانو)" | DE: "Knie-Valgus (X-Bein-Tendenz)"
-    - "Knee Varus" -> FA: "انحراف زانو به بیرون (واروس زانو)" | DE: "Knie-Varus (O-Bein-Tendenz)"
+    - "NOT_DEEP_ENOUGH" / "Knee depth insufficient" -> FA: "عمق ناکافی اسکات (عدم پایین رفتن کامل)" | DE: "Unzureichende Tiefe"
+    - "Knee Valgus" -> FA: "انحراف زانو به داخل (والگوس زانو)" | DE: "Knee-Valgus (X-Bein-Tendenz)"
+    - "Knee Varus" -> FA: "انحراف زانو به بیرون (واروس زانو)" | DE: "Knee-Varus (O-Bein-Tendenz)"
     - "Spine Flexion" / "Rounded Back" -> FA: "خم شدن/گرد شدن ستون فقرات" | DE: "Wirbelsäulenflexion (Runder Rücken)"
     - "Spine Extension" -> FA: "باز شدن/گودی بیش از حد ستون فقرات" | DE: "Wirbelsäulenextension"
     - "Elbow Flaring" -> FA: "باز شدن بیش از حد آرنج‌ها به طرفین (فلار شدن آرنج)" | DE: "Abspreizen der Ellenbogen (Elbow Flaring)"

@@ -44,6 +44,7 @@ class OllamaService:
         self, 
         messages: List[Dict[str, str]], 
         temperature: float = 0.7,
+        max_tokens: int = 1024,
         timeout: float = 300.0
     ) -> Optional[str]:
         """ارسال درخواست غیرهمگام Chat Completion به API سازگار با OpenAI در Ollama"""
@@ -51,7 +52,11 @@ class OllamaService:
         payload = {
             "model": self.model,
             "messages": messages,
-            "temperature": temperature
+            "temperature": temperature,
+            "max_tokens": max_tokens,  # برای جلوگیری از قطع شدن پاسخ در لایه OpenAI-compatible
+            "options": {
+                "num_predict": max_tokens  # برای اطمینان در ساختار بومی Ollama
+            }
         }
 
         try:

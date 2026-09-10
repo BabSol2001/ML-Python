@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from openai import AsyncOpenAI
+from neo4j import AsyncGraphDatabase  # استفاده از درایور بومی برای اجرای Cypher
 from graphiti_core import Graphiti
 from graphiti_core.nodes import EpisodeType
 from graphiti_core.llm_client import LLMConfig, OpenAIClient
@@ -12,7 +13,6 @@ from graphiti_core.driver.neo4j_driver import Neo4jDriver
 from config import settings
 
 logger = logging.getLogger("GraphitiClient")
-
 logging.getLogger("neo4j").setLevel(logging.ERROR)
 logging.getLogger("graphiti_core").setLevel(logging.ERROR)
 
@@ -25,14 +25,32 @@ class GraphitiClient:
     def __init__(self):
         self._graphiti: Optional[Graphiti] = None
         self._driver: Optional[Neo4jDriver] = None
+        self._native_driver = None  # درایور اختصاصی Neo4j
 
     async def initialize(self) -> None:
         """
-        مقداردهی اولیه موتور Graphiti با دیتابیس اختصاصی Neo4j و سرویس Ollama
+        مقداردهی اولیه موتور Graphiti و درایورهای Neo4j
         """
-        if not self._graphiti:
-            os.environ.setdefault("OPENAI_API_KEY", "ollama")
+        os.environ.setdefault("OPENAI_API_KEY", "ollama")
 
+        neo4j_uri = settings.NEO4J_URI.replace("localhost", "127.0.0.1")
+        db_name = getattr(settings, "NEO4J_DATABASE", "kgimageprocessdb")
+        auth = (settings.NEO4J_USER, settings.NEO4J_PASSWORD)
+
+        # ۱. درایور بومی برای کوئری‌های صریح Cypher
+        if not self._native_driver:
+            self._native_driver = AsyncGraphDatabase.driver(neo4j_uri, auth=auth)
+
+        # ۲. درایور مخصوص Graphiti
+        if not self._driver:
+            self._driver = Neo4jDriver(
+                uri=neo4j_uri,
+                user=settings.NEO4J_USER,
+                password=settings.NEO4J_PASSWORD,
+                database=db_name
+            )
+
+        if not self._graphiti:
             ollama_api_url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/v1"
 
             custom_openai_client = AsyncOpenAI(
@@ -57,16 +75,6 @@ class GraphitiClient:
             )
             embedder_client = OpenAIEmbedder(config=embedder_config, client=custom_openai_client)
 
-            neo4j_uri = settings.NEO4J_URI.replace("localhost", "127.0.0.1")
-            db_name = getattr(settings, "NEO4J_DATABASE", "kgimageprocessdb")
-
-            self._driver = Neo4jDriver(
-                uri=neo4j_uri,
-                user=settings.NEO4J_USER,
-                password=settings.NEO4J_PASSWORD,
-                database=db_name
-            )
-
             self._graphiti = Graphiti(
                 graph_driver=self._driver,
                 llm_client=llm_client,
@@ -77,10 +85,13 @@ class GraphitiClient:
 
     async def close(self) -> None:
         """بستن اتصالات دیتابیس"""
-        if self._graphiti:
-            await self._graphiti.close()
-            self._graphiti = None
+        if self._native_driver:
+            await self._native_driver.close()
+            self._native_driver = None
+        if self._driver:
+            await self._driver.close()
             self._driver = None
+        self._graphiti = None
 
     async def add_workout_episode(
         self,
@@ -106,9 +117,6 @@ class GraphitiClient:
         )
 
     async def log_biomechanical_fact(self, user_id: str, session_id: str, error_code: str, details: str) -> None:
-        """
-        ثبت اختصاصی فکت‌های خطا/بیومکانیک کاربر در حافظه زمان‌مند Graphiti
-        """
         fact_text = f"Biomechanical error detected: {error_code}. Details: {details}"
         await self.add_workout_episode(
             user_id=user_id,
@@ -126,65 +134,61 @@ class GraphitiClient:
         """
         جستجو در حافظه گرافی کاربر
         """
-        if not self._graphiti or not self._driver:
-            raise RuntimeError("موتور Graphiti یا درایور Neo4j مقداردهی نشده است.")
-
         memory_facts = []
 
-        try:
-            search_response = await self._graphiti.search(query=query, group_ids=[user_id])
-            
-            edges = (
-                getattr(search_response, "edges", None)
-                or getattr(search_response, "results", None)
-                or (search_response if isinstance(search_response, list) else [])
-            )
-            
-            for item in edges[:num_results]:
-                fact_text = (
-                    getattr(item, "fact", None)
-                    or getattr(item, "content", None)
-                    or getattr(item, "body", None)
-                    or getattr(item, "name", None)
-                    or getattr(item, "episode_body", None)
-                    or str(item)
-                )
-                if fact_text and fact_text not in [m["fact"] for m in memory_facts]:
-                    memory_facts.append({
-                        "fact": fact_text,
-                        "valid_at": str(getattr(item, "valid_at", "")),
-                        "invalid_at": str(getattr(item, "invalid_at", ""))
-                    })
-        except Exception as e:
-            logger.warning(f"⚠️ خطای جستجوی گراف Graphiti: {e}")
-
-        # Fallback به Cypher برای بازیابی مستقیم تمام گره‌ها و اپیزودها
-        if not memory_facts:
+        # ۱. تلاش برای جستجوی سمانتیک با Graphiti
+        if self._graphiti:
             try:
+                search_response = await self._graphiti.search(query=query, group_ids=[user_id])
+                edges = getattr(search_response, "edges", []) or getattr(search_response, "results", []) or (search_response if isinstance(search_response, list) else [])
+                for item in edges[:num_results]:
+                    fact_text = getattr(item, "fact", None) or getattr(item, "content", None) or getattr(item, "episode_body", None)
+                    if fact_text and str(fact_text) not in [m["fact"] for m in memory_facts]:
+                        memory_facts.append({
+                            "fact": str(fact_text),
+                            "valid_at": str(getattr(item, "valid_at", None) or getattr(item, "created_at", None))
+                        })
+            except Exception as e:
+                logger.warning(f"⚠️ خطای جستجوی سمانتیک: {e}")
+
+        # ۲. Fallback صریح Cypher با درایور بومی
+        if not memory_facts and self._native_driver:
+            try:
+                db_name = getattr(settings, "NEO4J_DATABASE", "kgimageprocessdb")
                 cypher_query = """
-                MATCH (n)
-                WHERE n:Episodic OR n:EpisodicNode OR n:Entity OR n:EntityNode OR n:Fact OR n:Episode
-                WITH n, COALESCE(n.body, n.content, n.fact, n.episode_body, n.name, n.source_description) AS text_val
-                WHERE text_val IS NOT NULL AND text_val <> ''
-                RETURN text_val AS content, 
-                       COALESCE(n.created_at, n.valid_at) AS created_at
-                ORDER BY created_at DESC
+                MATCH (u:User {id: $user_id})-[*1..2]-(n)
+                WITH n,
+                     CASE 
+                        WHEN 'Frame' IN labels(n) THEN
+                            "Frame Error: " + COALESCE(n.error_code, "Unknown Error") + 
+                            " | Knee Angle: " + toString(COALESCE(n.knee_angle, "")) + 
+                            " | Frame ID: " + toString(COALESCE(n.frame_id, ""))
+                        WHEN 'WorkoutSession' IN labels(n) THEN
+                            "Workout Session: " + COALESCE(n.exercise_name, "Exercise")
+                        ELSE
+                            COALESCE(n.fact, n.details, n.episode_body, n.content, n.name)
+                     END AS fact_str,
+                     COALESCE(n.timestamp, n.created_at, n.valid_at) AS valid_time
+                WHERE fact_str IS NOT NULL AND fact_str <> ''
+                RETURN DISTINCT fact_str AS content, valid_time
+                ORDER BY valid_time DESC
                 LIMIT $limit
                 """
-                records, _, _ = await self._driver.execute_query(
+                
+                records, _, _ = await self._native_driver.execute_query(
                     cypher_query, 
-                    limit=num_results
+                    user_id=user_id,
+                    limit=num_results,
+                    database_=db_name
                 )
                 
                 for rec in records:
-                    content = rec.get("content")
-                    created_at = rec.get("created_at")
-                    
-                    if content and str(content) not in [m["fact"] for m in memory_facts]:
+                    content = rec["content"]
+                    created_at = rec["valid_time"]
+                    if content and content not in [m["fact"] for m in memory_facts]:
                         memory_facts.append({
                             "fact": str(content),
-                            "valid_at": str(created_at) if created_at else "",
-                            "invalid_at": None
+                            "valid_at": str(created_at) if created_at else None
                         })
             except Exception as e:
                 logger.error(f"⚠️ خطای بازیابی مستقیم Cypher: {e}")

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from api.websocket_pose import router as websocket_router
+from api.chat_feedback import router as chat_router  # 👈 اضافه شدن راوتر چت
 from db.neo4j_client import neo4j_client
 from db.graphiti_client import graphiti_client
 from ollama_connection.ollama_client import ollama_service
@@ -16,7 +17,7 @@ async def lifespan(app: FastAPI):
         ollama_service.setup_environment()
         print("🦙 سرویس Ollama محلی شناسایی شد و آماده استفاده است.")
     else:
-        print("⚠️ سرویس Ollama محلی روی پورت 11434 یافت نشد! مطمئن شوید 'ollama run llama3' در حال اجراست.")
+        print(f"⚠️ سرویس Ollama محلی روی پورت 11434 یافت نشد! مطمئن شوید 'ollama run {settings.OLLAMA_MODEL}' در حال اجراست.")
 
     # ۱. برقراری اتصال غیرهمگام به Neo4j
     try:
@@ -63,7 +64,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ثبت Routerها
 app.include_router(websocket_router, tags=["Live Pose Processing"])
+app.include_router(chat_router)  # 👈 اضافه شدن راوتر چت RAG
 
 
 @app.get("/health", tags=["System"])
