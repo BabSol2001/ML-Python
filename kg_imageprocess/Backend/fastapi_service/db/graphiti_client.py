@@ -10,6 +10,8 @@ from graphiti_core.embedder import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.driver.neo4j_driver import Neo4jDriver
 from config import settings
 
+logger = logging.getLogger("GraphitiClient")
+
 logging.getLogger("neo4j").setLevel(logging.ERROR)
 logging.getLogger("graphiti_core").setLevel(logging.ERROR)
 
@@ -75,8 +77,9 @@ class GraphitiClient:
             
             try:
                 await self._graphiti.build_indices_and_constraints()
-            except Exception:
-                pass
+                logger.info("✅ شاخص‌ها و قیود Graphiti با موفقیت ساخته شدند.")
+            except Exception as e:
+                logger.warning(f"ساخت شاخص‌های Graphiti با خطا مواجه شد یا قبلا وجود داشته است: {e}")
 
     async def close(self) -> None:
         """بستن اتصالات دیتابیس"""
@@ -84,6 +87,7 @@ class GraphitiClient:
             await self._graphiti.close()
             self._graphiti = None
             self._driver = None
+            logger.info("❌ اتصالات Graphiti بسته شد.")
 
     async def add_workout_episode(
         self,
@@ -106,6 +110,19 @@ class GraphitiClient:
             source_description=f"User {user_id} - {source_description}",
             reference_time=ref_time,
             group_id=user_id
+        )
+        logger.info(f"🧠 اپیزود جدید در Graphiti برای کاربر {user_id} ثبت شد.")
+
+    async def log_biomechanical_fact(self, user_id: str, session_id: str, error_code: str, details: str) -> None:
+        """
+        ثبت اختصاصی فکت‌های خطا/بیومکانیک کاربر در حافظه زمان‌مند Graphiti
+        """
+        fact_text = f"Biomechanical error detected: {error_code}. Details: {details}"
+        await self.add_workout_episode(
+            user_id=user_id,
+            session_id=session_id,
+            episode_body=fact_text,
+            source_description="Realtime Pose Analysis Error"
         )
 
     async def search_user_memory(
@@ -148,9 +165,9 @@ class GraphitiClient:
                         "invalid_at": str(getattr(item, "invalid_at", ""))
                     })
         except Exception as e:
-            print(f"⚠️ خطای جستجوی گراف Graphiti: {e}")
+            logger.warning(f"⚠️ خطای جستجوی گراف Graphiti: {e}")
 
-        # ۲. Fallback صریح و قطعی با Cypher (پوشش تمام برچسب‌ها و پروپرتی‌های ممکن در Graphiti)
+        # ۲. Fallback صریح و قطعی با Cypher
         if not memory_facts:
             try:
                 cypher_query = """
@@ -169,8 +186,8 @@ class GraphitiClient:
                 )
                 
                 for rec in records:
-                    content = rec["content"] if "content" in rec else None
-                    created_at = rec["created_at"] if "created_at" in rec else None
+                    content = rec.get("content")
+                    created_at = rec.get("created_at")
                     
                     if content and str(content) not in [m["fact"] for m in memory_facts]:
                         memory_facts.append({
@@ -179,8 +196,9 @@ class GraphitiClient:
                             "invalid_at": None
                         })
             except Exception as e:
-                print(f"⚠️ خطای بازیابی مستقیم Cypher: {e}")
+                logger.error(f"⚠️ خطای بازیابی مستقیم Cypher: {e}")
 
         return memory_facts
+
 
 graphiti_client = GraphitiClient()

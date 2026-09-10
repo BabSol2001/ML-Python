@@ -1,11 +1,15 @@
 import json
 import logging
+import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from schemas.pose_schema import PoseFramePayload, PoseFeedbackResponse
 from core.rule_engine import check_squat_rules
+from core.pose_calculator import calculate_angle_2d
 from services.django_client import fetch_athlete_context, check_user_subscription_status
+from services.neo4j_client import neo4j_client
+from services.graphiti_client import graphiti_client
 
 logger = logging.getLogger("WebSocketPose")
 router = APIRouter()
@@ -50,7 +54,19 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
 
     # ۳. دریافت context جامع بیومکانیکی و سوابق پزشکی کاربر از جانگو
     athlete_context = await fetch_athlete_context(user_id)
-    logger.info(f"✅ پرونده کاربر {user_id} دریافت شد. اعمال آستانه‌های پویا...")
+    logger.info(f"✅ پرونده کاربر {user_id} دریافت شد.")
+
+    # ۴. ایجاد جلسه تمرین جدید (WorkoutSession) در Neo4j
+    session_id = str(uuid.uuid4())
+    try:
+        if neo4j_client._driver:
+            await neo4j_client.create_session_node(
+                user_id=user_id, 
+                exercise_name="squat", 
+                session_uuid=session_id
+            )
+    except Exception as e:
+        logger.error(f"خطا در ایجاد گره جلسه تمرین در Neo4j: {e}")
 
     try:
         while True:
@@ -62,13 +78,49 @@ async def websocket_pose_endpoint(websocket: WebSocket, user_id: str):
                 json_data = json.loads(data)
                 payload = PoseFramePayload(**json_data)
 
-                # تحلیل لایو حرکت با Rule Engine + تزریق Athlete Context
+                # ۵. تحلیل لایو حرکت با Rule Engine + تزریق Athlete Context
                 feedback: PoseFeedbackResponse = check_squat_rules(
                     payload=payload, 
                     athlete_context=athlete_context
                 )
 
-                # ارسال بازخورد آنی زیر چند میلی‌ثانیه به کاربر
+                # ۶. استخراج زاویه واقعی زانو برای ثبت در گراف
+                keypoints_dict = {kp.id: (kp.x, kp.y) for kp in payload.keypoints if kp.score > 0.5}
+                knee_angle = 0.0
+                if all(k in keypoints_dict for k in [23, 25, 27]): # Hip, Knee, Ankle
+                    knee_angle = calculate_angle_2d(
+                        keypoints_dict[23], 
+                        keypoints_dict[25], 
+                        keypoints_dict[27]
+                    )
+
+                # ۷. ثبت فریم و زاویه در Neo4j
+                try:
+                    if neo4j_client._driver:
+                        await neo4j_client.log_frame_analysis(
+                            session_id=session_id,
+                            frame_id=payload.frame_id,
+                            knee_angle=round(knee_angle, 2),
+                            is_valid=feedback.is_valid,
+                            error_code=feedback.error_code
+                        )
+                except Exception as e:
+                    logger.error(f"خطا در ثبت فریم در Neo4j: {e}")
+
+                # ۸. ثبت فکت در Graphiti در صورت وجود خطای بیومکانیکی
+                if not feedback.is_valid and feedback.error_code:
+                    try:
+                        if graphiti_client._graphiti:
+                            await graphiti_client.log_biomechanical_fact(
+                                user_id=user_id,
+                                session_id=session_id,
+                                error_code=feedback.error_code,
+                                details=feedback.feedback_message
+                            )
+                    except Exception as e:
+                        logger.error(f"خطا در ثبت فکت در Graphiti: {e}")
+
+                # ۹. ارسال بازخورد آنی به کاربر
                 await websocket.send_text(feedback.model_dump_json())
 
             except ValidationError as e:

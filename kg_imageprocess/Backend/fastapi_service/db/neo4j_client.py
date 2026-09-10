@@ -1,7 +1,11 @@
+import uuid
+import logging
 from typing import Any, Dict, List, Optional
-from typing_extensions import LiteralString  # برای پشتیبانی در پایتون‌های قدیمی‌تر یا typing رسمی
+from typing_extensions import LiteralString
 from neo4j import AsyncGraphDatabase, AsyncDriver, Query
 from config import settings
+
+logger = logging.getLogger("Neo4jClient")
 
 class Neo4jClient:
     """
@@ -17,12 +21,14 @@ class Neo4jClient:
                 settings.NEO4J_URI,
                 auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
             )
+            logger.info("✅ اتصال به Neo4j برقرار شد.")
 
     async def close(self) -> None:
         """بستن Connection Pool هنگام خاموش شدن سرور"""
         if self._driver:
             await self._driver.close()
             self._driver = None
+            logger.info("❌ اتصال Neo4j بسته شد.")
 
     async def execute_query(
         self, 
@@ -35,8 +41,7 @@ class Neo4jClient:
         if not self._driver:
             raise RuntimeError("اتصال Neo4j هنوز برقرار نشده است. ابتدا تابع connect() را فراخوانی کنید.")
 
-        # تبدیل متغیر رشته‌ای معمولی به شیء Query رسمی درایور Neo4j
-        query_obj = query if isinstance(query, Query) else Query(str(query)) # type: ignore
+        query_obj = query if isinstance(query, Query) else Query(str(query))  # type: ignore
 
         async with self._driver.session() as session:
             result = await session.run(query_obj, parameters or {})
@@ -49,8 +54,65 @@ class Neo4jClient:
             records = await self.execute_query("RETURN 1 AS test")
             return len(records) > 0 and records[0].get("test") == 1
         except Exception as e:
-            print(f"خطا در اتصال به Neo4j: {e}")
+            logger.error(f"خطا در اتصال به Neo4j: {e}")
             return False
 
-# نمونه ایجادشده برای استفاده در کل برنامه (Singleton Pattern)
+    # =========================================================================
+    # متدهای بیومکانیکی جدید برای گام دوم (Domain Methods)
+    # =========================================================================
+
+    async def create_session_node(self, user_id: str, exercise_name: str, session_uuid: Optional[str] = None) -> str:
+        """
+        ایجاد گره Root برای جلسه تمرینی جدید
+        """
+        session_id = session_uuid or str(uuid.uuid4())
+        cypher = """
+        MERGE (u:User {id: $user_id})
+        CREATE (s:WorkoutSession {
+            id: $session_id,
+            exercise_name: $exercise_name,
+            created_at: datetime()
+        })
+        CREATE (u)-[:PERFORMED]->(s)
+        RETURN s.id AS session_id
+        """
+        await self.execute_query(cypher, {
+            "user_id": user_id,
+            "session_id": session_id,
+            "exercise_name": exercise_name
+        })
+        logger.info(f"📊 گره WorkoutSession با شناسه {session_id} در Neo4j ثبت شد.")
+        return session_id
+
+    async def log_frame_analysis(
+        self, 
+        session_id: str, 
+        frame_id: int, 
+        knee_angle: float, 
+        is_valid: bool, 
+        error_code: Optional[str] = None
+    ) -> None:
+        """
+        ثبت فریم تحلیل‌شده و متصل کردن آن به جلسه تمرینی در Neo4j
+        """
+        cypher = """
+        MATCH (s:WorkoutSession {id: $session_id})
+        CREATE (f:Frame {
+            frame_id: $frame_id,
+            knee_angle: $knee_angle,
+            is_valid: $is_valid,
+            error_code: $error_code,
+            timestamp: datetime()
+        })
+        CREATE (s)-[:HAS_FRAME]->(f)
+        """
+        await self.execute_query(cypher, {
+            "session_id": session_id,
+            "frame_id": frame_id,
+            "knee_angle": knee_angle,
+            "is_valid": is_valid,
+            "error_code": error_code or "NONE"
+        })
+
+
 neo4j_client = Neo4jClient()
