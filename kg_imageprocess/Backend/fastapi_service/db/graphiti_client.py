@@ -1,3 +1,4 @@
+import os
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -30,16 +31,16 @@ class GraphitiClient:
         مقداردهی اولیه موتور Graphiti با دیتابیس اختصاصی Neo4j و سرویس Ollama
         """
         if not self._graphiti:
+            os.environ.setdefault("OPENAI_API_KEY", "ollama")
+
             ollama_api_url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/v1"
 
-            # ۱. ساخت کلاینت AsyncOpenAI با تایم‌اوت ۶۰۰ ثانیه‌ای (۱۰ دقیقه)
             custom_openai_client = AsyncOpenAI(
                 base_url=ollama_api_url,
                 api_key="ollama",
                 timeout=600.0
             )
 
-            # ۲. ساخت کانفیگ و کلاینت LLM
             llm_config = LLMConfig(
                 api_key="ollama",
                 base_url=ollama_api_url,
@@ -48,7 +49,6 @@ class GraphitiClient:
             )
             llm_client = OpenAIClient(config=llm_config, client=custom_openai_client)
 
-            # ۳. ساخت کانفیگ و کلاینت Embedder
             embedder_config = OpenAIEmbedderConfig(
                 api_key="ollama",
                 base_url=ollama_api_url,
@@ -57,7 +57,6 @@ class GraphitiClient:
             )
             embedder_client = OpenAIEmbedder(config=embedder_config, client=custom_openai_client)
 
-            # ۴. تنظیمات دیتابیس Neo4j
             neo4j_uri = settings.NEO4J_URI.replace("localhost", "127.0.0.1")
             db_name = getattr(settings, "NEO4J_DATABASE", "kgimageprocessdb")
 
@@ -74,12 +73,7 @@ class GraphitiClient:
                 embedder=embedder_client,
                 cross_encoder=None
             )
-            
-            try:
-                await self._graphiti.build_indices_and_constraints()
-                logger.info("✅ شاخص‌ها و قیود Graphiti با موفقیت ساخته شدند.")
-            except Exception as e:
-                logger.warning(f"ساخت شاخص‌های Graphiti با خطا مواجه شد یا قبلا وجود داشته است: {e}")
+            logger.info(f"✅ موتور Graphiti با موفقیت روی دیتابیس '{db_name}' مقداردهی شد.")
 
     async def close(self) -> None:
         """بستن اتصالات دیتابیس"""
@@ -87,7 +81,6 @@ class GraphitiClient:
             await self._graphiti.close()
             self._graphiti = None
             self._driver = None
-            logger.info("❌ اتصالات Graphiti بسته شد.")
 
     async def add_workout_episode(
         self,
@@ -111,7 +104,6 @@ class GraphitiClient:
             reference_time=ref_time,
             group_id=user_id
         )
-        logger.info(f"🧠 اپیزود جدید در Graphiti برای کاربر {user_id} ثبت شد.")
 
     async def log_biomechanical_fact(self, user_id: str, session_id: str, error_code: str, details: str) -> None:
         """
@@ -132,14 +124,13 @@ class GraphitiClient:
         num_results: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        جستجو در حافظه گرافی کاربر با پشتیبانی از ساختار جدید Edgeهای Graphiti و پشتیبان جامع Cypher
+        جستجو در حافظه گرافی کاربر
         """
         if not self._graphiti or not self._driver:
             raise RuntimeError("موتور Graphiti یا درایور Neo4j مقداردهی نشده است.")
 
         memory_facts = []
 
-        # ۱. تلاش برای جستجو از طریق API استاندارد Graphiti
         try:
             search_response = await self._graphiti.search(query=query, group_ids=[user_id])
             
@@ -167,7 +158,7 @@ class GraphitiClient:
         except Exception as e:
             logger.warning(f"⚠️ خطای جستجوی گراف Graphiti: {e}")
 
-        # ۲. Fallback صریح و قطعی با Cypher
+        # Fallback به Cypher برای بازیابی مستقیم تمام گره‌ها و اپیزودها
         if not memory_facts:
             try:
                 cypher_query = """

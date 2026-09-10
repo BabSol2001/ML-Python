@@ -13,6 +13,8 @@ class Neo4jClient:
     """
     def __init__(self):
         self._driver: Optional[AsyncDriver] = None
+        # تنظیم دیتابیس هدف (در صورت عدم وجود در کانفیگ، kgimageprocessdb جایگزین می‌شود)
+        self._db_name: str = getattr(settings, "NEO4J_DATABASE", "kgimageprocessdb")
 
     async def connect(self) -> None:
         """برقراری اتصال غیرهمگام به Neo4j هنگام شروع برنامه"""
@@ -21,7 +23,7 @@ class Neo4jClient:
                 settings.NEO4J_URI,
                 auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
             )
-            logger.info("✅ اتصال به Neo4j برقرار شد.")
+            logger.info(f"✅ اتصال به Neo4j روی دیتابیس '{self._db_name}' برقرار شد.")
 
     async def close(self) -> None:
         """بستن Connection Pool هنگام خاموش شدن سرور"""
@@ -36,14 +38,15 @@ class Neo4jClient:
         parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        اجرای یک کوئری Cypher و بازگرداندن نتایج به صورت لیستی از دیکشنری‌ها
+        اجرای یک کوئری Cypher روی دیتابیس اختصاصی
         """
         if not self._driver:
             raise RuntimeError("اتصال Neo4j هنوز برقرار نشده است. ابتدا تابع connect() را فراخوانی کنید.")
 
         query_obj = query if isinstance(query, Query) else Query(str(query))  # type: ignore
 
-        async with self._driver.session() as session:
+        # اصلاح اصلی: مشخص کردن دیتابیس هدف در session
+        async with self._driver.session(database=self._db_name) as session:
             result = await session.run(query_obj, parameters or {})
             records = await result.data()
             return records
@@ -54,11 +57,11 @@ class Neo4jClient:
             records = await self.execute_query("RETURN 1 AS test")
             return len(records) > 0 and records[0].get("test") == 1
         except Exception as e:
-            logger.error(f"خطا در اتصال به Neo4j: {e}")
+            logger.error(f"خطا در اتصال به Neo4j ({self._db_name}): {e}")
             return False
 
     # =========================================================================
-    # متدهای بیومکانیکی جدید برای گام دوم (Domain Methods)
+    # متدهای بیومکانیکی (Domain Methods)
     # =========================================================================
 
     async def create_session_node(self, user_id: str, exercise_name: str, session_uuid: Optional[str] = None) -> str:
@@ -81,7 +84,7 @@ class Neo4jClient:
             "session_id": session_id,
             "exercise_name": exercise_name
         })
-        logger.info(f"📊 گره WorkoutSession با شناسه {session_id} در Neo4j ثبت شد.")
+        logger.info(f"📊 گره WorkoutSession با شناسه {session_id} در دیتابیس {self._db_name} ثبت شد.")
         return session_id
 
     async def log_frame_analysis(

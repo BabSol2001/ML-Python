@@ -8,8 +8,8 @@ from schemas.pose_schema import PoseFramePayload, PoseFeedbackResponse
 from core.rule_engine import check_squat_rules
 from core.pose_calculator import calculate_angle_2d
 from services.django_client import fetch_athlete_context, check_user_subscription_status
-from services.neo4j_client import neo4j_client
-from services.graphiti_client import graphiti_client
+from ..db.neo4j_client import neo4j_client
+from ..db.graphiti_client import graphiti_client
 
 logger = logging.getLogger("WebSocketPose")
 router = APIRouter()
